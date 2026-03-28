@@ -1,3 +1,4 @@
+import Link from "next/link";
 type AbsolutEntryCardProps = {
   title: string;
   content: string;
@@ -7,12 +8,13 @@ type AbsolutEntryCardProps = {
   curatorStatus?: string;
   pinned?: boolean;
   tags?: string[];
+  href?: string;
 };
 
 export function AbsolutEntryCard(props: AbsolutEntryCardProps) {
-  const { title, content, roomTitle, visibility, featuredLevel = 0, curatorStatus, pinned = false, tags = [] } = props;
+  const { title, content, roomTitle, visibility, featuredLevel = 0, curatorStatus, pinned = false, tags = [], href } = props;
   return (
-    <article className="data-card h-full flex flex-col">
+    <article className="data-card h-full flex flex-col group relative">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <span className="eyebrow">{visibility}</span>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -47,6 +49,13 @@ export function AbsolutEntryCard(props: AbsolutEntryCardProps) {
             </span>
           ))}
         </div>
+      )}
+      {href && (
+        <Link
+          href={href}
+          className="absolute inset-0 rounded-2xl focus:outline-none focus:ring-2 focus:ring-aura/50"
+          aria-label={`Czytaj: ${title}`}
+        />
       )}
     </article>
   );

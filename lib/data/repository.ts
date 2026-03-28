@@ -1,6 +1,6 @@
 import { demoCurations, demoDialogMessages, demoEntries, demoRooms } from "@/lib/mock/data";
 import { isMockMode } from "@/lib/env";
-import { CuratorStatus, DialogMessage, Entry, EntryVersion, Room, Tag } from "@/lib/data/types";
+import { CuratorStatus, DialogMessage, Entry, EntryVersion, Notification, NotificationKind, OwnerApplication, Room, RoomStatus, Tag } from "@/lib/data/types";
 import { getSupabaseClient } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/auth/server";
 
@@ -21,6 +21,10 @@ type RoomRow = {
   mission: string;
   qr_code_url: string | null;
   hero_image_url: string | null;
+  status?: string;
+  system_prompt?: string | null;
+  public_summary?: string | null;
+  visual_style?: string | null;
 };
 
 type EntryRow = {
@@ -124,10 +128,12 @@ function roomFromRow(row: RoomRow): Room {
     slug: row.slug,
     theme: row.theme,
     mission: row.mission,
-    visualStyle: "System visual profile",
+    visualStyle: row.visual_style ?? "System visual profile",
     qrCodeUrl: row.qr_code_url ?? "",
     heroImageUrl: row.hero_image_url ?? "",
-    publicSummary: row.mission,
+    publicSummary: row.public_summary ?? row.mission,
+    status: (row.status ?? "active") as RoomStatus,
+    systemPrompt: row.system_prompt ?? null,
   };
 }
 
@@ -324,6 +330,8 @@ export async function getAbsolutEntries(
             qrCodeUrl: "",
             heroImageUrl: "",
             publicSummary: "",
+            status: "active",
+            systemPrompt: null,
           };
 
           const entry: Entry = {
@@ -611,6 +619,246 @@ export async function performAdminEntryAction(input: {
     p_entry_id: input.entryId,
   });
   if (error) throw error;
+}
+
+// ─── View counts ────────────────────────────────────────────────────────────
+
+export async function recordEntryView(entryId: string, role: string = "guest"): Promise<void> {
+  if (isMockMode()) return;
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  await (supabase as any).rpc("record_entry_view", { p_entry_id: entryId, p_role: role });
+}
+
+export async function getEntryViewCount(entryId: string): Promise<number> {
+  if (isMockMode()) return 0;
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+  const { data } = await (supabase as any).rpc("get_entry_view_count", { p_entry_id: entryId });
+  return Number(data ?? 0);
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export async function getOwnerUnreadCount(): Promise<number> {
+  if (isMockMode()) return 0;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return 0;
+  const { data } = await (supabase as any).rpc("get_owner_unread_count");
+  return Number(data ?? 0);
+}
+
+type NotificationRow = {
+  id: string;
+  owner_id: string;
+  kind: NotificationKind;
+  entry_id: string | null;
+  is_read: boolean;
+  created_at: string;
+};
+
+export async function getOwnerNotifications(): Promise<Notification[]> {
+  if (isMockMode()) return [];
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await (supabase as any)
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) throw error;
+  return (data as NotificationRow[]).map((row) => ({
+    id: row.id,
+    ownerId: row.owner_id,
+    kind: row.kind,
+    entryId: row.entry_id,
+    isRead: row.is_read,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function markNotificationsRead(): Promise<void> {
+  if (isMockMode()) return;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return;
+  await (supabase as any).rpc("mark_notifications_read");
+}
+
+// ─── Owner applications ──────────────────────────────────────────────────────
+
+type ApplicationRow = {
+  id: string;
+  email: string;
+  display_name: string;
+  motivation: string;
+  status: string;
+  reviewed_at: string | null;
+  created_at: string;
+};
+
+export async function submitOwnerApplication(input: {
+  email: string;
+  displayName: string;
+  motivation: string;
+}): Promise<void> {
+  if (isMockMode()) return;
+  const supabase = getSupabaseClient();
+  if (!supabase) throw new Error("Supabase client is not configured");
+  const { error } = await (supabase as any).rpc("submit_owner_application", {
+    p_email: input.email,
+    p_display_name: input.displayName,
+    p_motivation: input.motivation,
+  });
+  if (error) throw error;
+}
+
+export async function getOwnerApplications(): Promise<OwnerApplication[]> {
+  if (isMockMode()) return [];
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+  const { data, error } = await (supabase as any)
+    .from("owner_applications")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data as ApplicationRow[]).map((row) => ({
+    id: row.id,
+    email: row.email,
+    displayName: row.display_name,
+    motivation: row.motivation,
+    status: row.status as OwnerApplication["status"],
+    reviewedAt: row.reviewed_at,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function reviewOwnerApplication(applicationId: string, decision: "approved" | "rejected"): Promise<void> {
+  if (isMockMode()) return;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase server client is not configured");
+  const { error } = await (supabase as any).rpc("review_owner_application", {
+    p_application_id: applicationId,
+    p_decision: decision,
+  });
+  if (error) throw error;
+}
+
+// ─── Room metadata (owner) ───────────────────────────────────────────────────
+
+export async function updateRoomMeta(input: {
+  roomId: string;
+  title: string;
+  publicSummary: string;
+  heroImageUrl?: string;
+  qrCodeUrl?: string;
+}): Promise<void> {
+  if (isMockMode()) return;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase server client is not configured");
+  const { error } = await (supabase as any).rpc("owner_update_room_meta", {
+    p_room_id: input.roomId,
+    p_title: input.title,
+    p_public_summary: input.publicSummary,
+    p_hero_image_url: input.heroImageUrl ?? null,
+    p_qr_code_url: input.qrCodeUrl ?? null,
+  });
+  if (error) throw error;
+}
+
+// ─── Full-text search ────────────────────────────────────────────────────────
+
+export type SearchResult = {
+  id: string;
+  title: string;
+  content: string;
+  visibility: string;
+  createdAt: string;
+  room: { id: string; title: string; slug: string };
+  featuredLevel: number;
+  curatorStatus: string;
+  pinned: boolean;
+  rank: number;
+};
+
+export async function searchAbsolutEntries(query: string, limit = 20, offset = 0): Promise<SearchResult[]> {
+  if (isMockMode() || !query.trim()) return [];
+  const supabase = getSupabaseClient();
+  if (!supabase) return [];
+  const { data, error } = await (supabase as any).rpc("search_absolut_entries", {
+    p_query: query.trim(),
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw error;
+  return (data as any[]).map((row) => ({
+    id: row.id,
+    title: row.title,
+    content: row.content,
+    visibility: row.visibility,
+    createdAt: row.created_at,
+    room: { id: row.room_id, title: row.room_title, slug: row.room_slug },
+    featuredLevel: row.featured_level ?? 0,
+    curatorStatus: row.curator_status ?? "pending",
+    pinned: row.pinned ?? false,
+    rank: row.rank ?? 0,
+  }));
+}
+
+// ─── Single ABSOLUT entry ────────────────────────────────────────────────────
+
+export async function getAbsolutEntryById(
+  entryId: string,
+): Promise<(Entry & { room: Room; featuredLevel: number; curatorStatus: string; pinned: boolean; tags: string[]; viewCount: number }) | null> {
+  if (isMockMode()) {
+    const entry = demoEntries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    const rooms = await getRooms();
+    const curation = demoCurations.find((c) => c.entryId === entryId);
+    return {
+      ...entry,
+      room: rooms.find((r) => r.id === entry.roomId)!,
+      featuredLevel: curation?.featuredLevel ?? 0,
+      curatorStatus: curation?.curatorStatus ?? "pending",
+      pinned: curation?.pinned ?? false,
+      tags: [],
+      viewCount: 0,
+    };
+  }
+
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await (supabase as any)
+    .from("entries")
+    .select(`
+      *,
+      rooms (*),
+      curations (featured_level, curator_status, pinned),
+      entry_tags (tags (name)),
+      entry_view_counts (view_count)
+    `)
+    .eq("id", entryId)
+    .eq("visibility", "curated_public")
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    id: data.id,
+    roomId: data.room_id,
+    title: data.title,
+    content: data.content,
+    visibility: data.visibility,
+    createdAt: data.created_at,
+    isCurated: data.is_curated,
+    locked: data.locked ?? false,
+    room: roomFromRow(data.rooms),
+    featuredLevel: data.curations?.featured_level ?? 0,
+    curatorStatus: data.curations?.curator_status ?? "pending",
+    pinned: data.curations?.pinned ?? false,
+    tags: (data.entry_tags ?? []).map((et: any) => et.tags?.name).filter(Boolean),
+    viewCount: data.entry_view_counts?.view_count ?? 0,
+  };
 }
 
 export async function getAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogResult> {

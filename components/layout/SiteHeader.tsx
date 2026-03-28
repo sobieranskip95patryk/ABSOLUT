@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getAuthState } from "@/lib/auth/server";
 import { logoutAction } from "@/lib/auth/actions";
+import { getOwnerUnreadCount } from "@/lib/data/repository";
 
 export async function SiteHeader() {
   const { user, role } = await getAuthState();
   const isAdmin = role === "admin" || role === "curator";
+  const unreadCount = role === "owner" ? await getOwnerUnreadCount().catch(() => 0) : 0;
 
   const navigation = [
     { href: "/", label: "Start" },
@@ -32,8 +34,13 @@ export async function SiteHeader() {
         </Link>
         <nav className="flex flex-wrap gap-4 text-xs uppercase tracking-[0.18em] text-mist">
           {navigation.map((item) => (
-            <Link key={item.href} href={item.href} className="transition hover:text-white">
+            <Link key={item.href} href={item.href} className="relative transition hover:text-white">
               {item.label}
+              {item.label === "Member" && unreadCount > 0 && (
+                <span className="absolute -right-3 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-gold text-[9px] font-bold text-ink">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </Link>
           ))}
 

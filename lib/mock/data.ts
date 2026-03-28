@@ -12,6 +12,8 @@ export const demoRooms: Room[] = [
     qrCodeUrl: "https://www.mtaquestwebsidex.com/rooms/absolut",
     heroImageUrl: "/placeholder/absolut.jpg",
     publicSummary: "Rdzen biblioteki, gdzie wybrane fragmenty zyskuja wspolny kontekst.",
+    status: "active",
+    systemPrompt: null,
   },
   {
     id: "room-van-gogh",
@@ -24,6 +26,8 @@ export const demoRooms: Room[] = [
     qrCodeUrl: "https://www.mtaquestwebsidex.com/rooms/van-gogh-edition",
     heroImageUrl: "/placeholder/van-gogh.jpg",
     publicSummary: "Pokoj sztuki i intensywnosci emocjonalnej.",
+    status: "active",
+    systemPrompt: null,
   },
   {
     id: "room-logos",
@@ -36,6 +40,8 @@ export const demoRooms: Room[] = [
     qrCodeUrl: "https://www.mtaquestwebsidex.com/rooms/logos",
     heroImageUrl: "/placeholder/logos.jpg",
     publicSummary: "Pokoj architektury znaczen i porzadku mysli.",
+    status: "active",
+    systemPrompt: null,
   },
   {
     id: "room-cosmos",
@@ -48,6 +54,8 @@ export const demoRooms: Room[] = [
     qrCodeUrl: "https://www.mtaquestwebsidex.com/rooms/cosmos",
     heroImageUrl: "/placeholder/cosmos.jpg",
     publicSummary: "Pokoj obserwacji, skali i dalekiego zasiegu.",
+    status: "active",
+    systemPrompt: null,
   },
   {
     id: "room-origin",
@@ -60,6 +68,8 @@ export const demoRooms: Room[] = [
     qrCodeUrl: "https://www.mtaquestwebsidex.com/rooms/origin",
     heroImageUrl: "/placeholder/origin.jpg",
     publicSummary: "Pokoj poczatku i kierunku calego systemu.",
+    status: "active",
+    systemPrompt: null,
   },
 ];
 

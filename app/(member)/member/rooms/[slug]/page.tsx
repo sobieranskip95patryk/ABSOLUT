@@ -11,12 +11,14 @@ import {
   getRooms,
 } from "@/lib/data/repository";
 import { runMemberConsentAction, runMemberEntryAction } from "@/app/(member)/member/rooms/[slug]/actions";
+import { runRoomMetaAction } from "@/app/(member)/member/rooms/[slug]/room-actions";
 
 function memberSuccessMessage(code: string) {
   if (code === "create") return "Utworzono nowy wpis.";
   if (code === "update") return "Zapisano zmiany wpisu.";
   if (code === "request_curation") return "Wpis zostal zgloszony do kuracji.";
   if (code === "consent_saved") return "Zapisano zgody publikacyjne.";
+  if (code === "room_meta_saved") return "Metadane pokoju zostaly zapisane.";
   return "Operacja zakonczona powodzeniem.";
 }
 
@@ -27,6 +29,9 @@ function memberErrorMessage(code: string) {
   if (code === "missing_entry_fields") return "Uzupelnij tytul i tresc wpisu.";
   if (code === "entry_locked") return "Wpis jest zablokowany do edycji — oczekuje na kuracje.";
   if (code === "invalid_request") return "Nieprawidlowe dane zadania.";
+  if (code === "missing_fields") return "Wypelnij wymagane pola.";
+  if (code === "room_archived") return "Pokoj jest zarchiwizowany — edycja metadanych zablokowana.";
+  if (code === "update_failed") return "Blad podczas zapisywania metadanych pokoju.";
   return "Operacja nie powiodla sie. Sprobuj ponownie.";
 }
 
@@ -86,6 +91,61 @@ export default async function MemberRoomPage({
               {memberErrorMessage(status.error)}
             </p>
           ) : null}
+
+            {/* Room meta edit — owner only, blocked when archived */}
+            {role === "owner" ? (
+              <form action={runRoomMetaAction} className="mt-8 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-5">
+                <input type="hidden" name="slug" value={slug} />
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold text-white">Metadane pokoju</h2>
+                  {room.status === "archived" && (
+                    <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-amber-300">
+                      zarchiwizowany
+                    </span>
+                  )}
+                </div>
+                {room.status === "archived" ? (
+                  <p className="text-xs text-amber-300/80">
+                    Pokoj jest zarchiwizowany. Metadane sa tylko do odczytu.
+                  </p>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      name="title"
+                      defaultValue={room.title}
+                      placeholder="Tytul pokoju"
+                      required
+                      className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm text-white"
+                    />
+                    <textarea
+                      name="publicSummary"
+                      rows={3}
+                      defaultValue={room.publicSummary ?? ""}
+                      placeholder="Publiczne podsumowanie pokoju"
+                      className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-3 text-sm text-white"
+                    />
+                    <input
+                      type="url"
+                      name="heroImageUrl"
+                      defaultValue={room.heroImageUrl ?? ""}
+                      placeholder="URL obrazu hero (opcjonalnie)"
+                      className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm text-white"
+                    />
+                    <input
+                      type="url"
+                      name="qrCodeUrl"
+                      defaultValue={room.qrCodeUrl ?? ""}
+                      placeholder="URL kodu QR (opcjonalnie)"
+                      className="w-full rounded-xl border border-white/15 bg-black/20 px-4 py-2 text-sm text-white"
+                    />
+                    <button type="submit" className="action-secondary w-max">
+                      Zapisz metadane
+                    </button>
+                  </>
+                )}
+              </form>
+            ) : null}
 
           {/* New entry form */}
           <form action={runMemberEntryAction} className="mt-8 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-5">

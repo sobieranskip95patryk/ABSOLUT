@@ -4,6 +4,17 @@ export type EntryVisibility = "private" | "curated_public" | "public_room";
 
 export type CuratorStatus = "pending" | "review" | "approved" | "featured" | "rejected" | "archived";
 
+export type RoomStatus = "active" | "archived";
+
+export type ApplicationStatus = "pending" | "approved" | "rejected";
+
+export type NotificationKind =
+  | "curation_approved"
+  | "curation_rejected"
+  | "curation_featured"
+  | "curation_reviewed"
+  | "curation_archived";
+
 export type Room = {
   id: string;
   ownerId: string;
@@ -15,6 +26,8 @@ export type Room = {
   qrCodeUrl: string;
   heroImageUrl: string;
   publicSummary: string;
+  status: RoomStatus;
+  systemPrompt: string | null;
 };
 
 export type Entry = {
@@ -64,4 +77,23 @@ export type RoomBundle = {
   room: Room;
   entries: Entry[];
   dialogMessages: DialogMessage[];
+};
+
+export type Notification = {
+  id: string;
+  ownerId: string;
+  kind: NotificationKind;
+  entryId: string | null;
+  isRead: boolean;
+  createdAt: string;
+};
+
+export type OwnerApplication = {
+  id: string;
+  email: string;
+  displayName: string;
+  motivation: string;
+  status: ApplicationStatus;
+  reviewedAt: string | null;
+  createdAt: string;
 };

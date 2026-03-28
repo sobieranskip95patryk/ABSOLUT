@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AbsolutEntryCard } from "@/components/absolut/AbsolutEntryCard";
 import { PageShell } from "@/components/layout/PageShell";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getAbsolutEntries, getAbsolutTags, type AbsolutView } from "@/lib/data/repository";
+import { getAbsolutEntries, getAbsolutTags, searchAbsolutEntries, type AbsolutView } from "@/lib/data/repository";
 
 const VIEW_LABELS: Record<AbsolutView, string> = {
   newest: "Najnowsze",
@@ -13,17 +13,21 @@ const VIEW_LABELS: Record<AbsolutView, string> = {
 export default async function AbsolutPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ view?: string; tag?: string }>;
+  searchParams?: Promise<{ view?: string; tag?: string; q?: string }>;
 }) {
   const params = await searchParams;
   const rawView = params?.view ?? "newest";
   const view: AbsolutView = (rawView === "top" || rawView === "thematic") ? rawView : "newest";
   const activeTag = params?.tag ?? undefined;
+  const searchQuery = (params?.q ?? "").trim();
 
-  const [entries, tags] = await Promise.all([
-    getAbsolutEntries(view, activeTag),
+  const [baseEntries, tags, searchResults] = await Promise.all([
+    searchQuery ? Promise.resolve([]) : getAbsolutEntries(view, activeTag),
     getAbsolutTags(),
+    searchQuery ? searchAbsolutEntries(searchQuery) : Promise.resolve([]),
   ]);
+
+  const entries = searchQuery ? searchResults : baseEntries;
 
   function viewHref(v: AbsolutView) {
     const q = new URLSearchParams();
@@ -51,7 +55,25 @@ export default async function AbsolutPage({
           />
 
           {/* View mode selector */}
-          <nav className="mt-8 flex flex-wrap gap-2" aria-label="Tryb widoku">
+          {/* Search */}
+          <form method="get" action="/absolut" className="mt-8">
+            <div className="flex gap-2">
+              <input
+                type="search"
+                name="q"
+                defaultValue={searchQuery}
+                placeholder="Szukaj w ABSOLUT..."
+                className="flex-1 rounded-full border border-white/20 bg-black/20 px-5 py-2.5 text-sm text-white placeholder:text-mist/60 outline-none focus:border-aura/50"
+              />
+              <button type="submit" className="action-secondary">Szukaj</button>
+              {searchQuery && (
+                <Link href="/absolut" className="action-secondary">Wyczysc</Link>
+              )}
+            </div>
+          </form>
+
+          {/* View mode selector — hidden during search */}
+          {!searchQuery && <nav className="mt-6 flex flex-wrap gap-2" aria-label="Tryb widoku">
             {(Object.keys(VIEW_LABELS) as AbsolutView[]).map((v) => (
               <Link
                 key={v}
@@ -66,6 +88,7 @@ export default async function AbsolutPage({
               </Link>
             ))}
           </nav>
+          }
 
           {/* Tag filter */}
           {tags.length > 0 && (
@@ -101,12 +124,13 @@ export default async function AbsolutPage({
                 key={entry.id}
                 title={entry.title}
                 content={entry.content}
-                roomTitle={entry.room.title}
+                roomTitle={"room" in entry ? entry.room.title : ""}
                 visibility={entry.visibility}
-                featuredLevel={entry.featuredLevel}
-                curatorStatus={entry.curatorStatus}
-                pinned={entry.pinned}
-                tags={entry.tags}
+                featuredLevel={"featuredLevel" in entry ? entry.featuredLevel : 0}
+                curatorStatus={"curatorStatus" in entry ? entry.curatorStatus : undefined}
+                pinned={"pinned" in entry ? entry.pinned : false}
+                tags={"tags" in entry ? (entry as any).tags : []}
+                href={`/absolut/${entry.id}`}
               />
             ))}
           </div>
