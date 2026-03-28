@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 
 type AdminSubmitButtonProps = {
-  value: "approve" | "publish" | "reject" | "revoke";
+  value: "approve" | "publish" | "reject" | "revoke" | "review" | "feature" | "archive" | "pin" | "unpin";
   label: string;
   confirmMessage?: string;
 };

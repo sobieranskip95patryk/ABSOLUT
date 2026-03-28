@@ -9,13 +9,19 @@ function successMessage(code: string) {
   if (code === "approved") return "Kuracja zatwierdzona.";
   if (code === "published") return "Wpis opublikowany w ABSOLUT.";
   if (code === "rejected") return "Kuracja odrzucona.";
-  if (code === "revoked") return "Publikacja cofnięta.";
+  if (code === "revoked") return "Publikacja cofnieta.";
+  if (code === "reviewed") return "Wpis przekazany do review.";
+  if (code === "featured") return "Wpis oznaczony jako featured.";
+  if (code === "archived") return "Wpis zarchiwizowany.";
+  if (code === "pinned") return "Wpis przypiety na gorze.";
+  if (code === "unpinned") return "Przypiecenie usuniete.";
   return "Operacja zakonczona powodzeniem.";
 }
 
 function errorMessage(code: string) {
   if (code === "forbidden") return "Brak uprawnien do wykonania tej operacji.";
   if (code === "entry_not_found") return "Nie znaleziono wskazanego wpisu.";
+  if (code === "curation not found") return "Brak rekordu kuracji dla tego wpisu.";
   if (code === "invalid_request") return "Nieprawidlowe dane zadania operacji.";
   if (code === "auth_required") return "Sesja wygasla lub wymagane jest ponowne logowanie.";
   return "Operacja nie powiodla sie. Sprawdz logi i sprobuj ponownie.";
@@ -61,24 +67,52 @@ export default async function AdminPage({
           <article key={item.id} className="panel p-6">
             {(() => {
               const isCuratedPublic = item.entry.visibility === "curated_public";
-              const isApproved = item.curatorStatus === "approved";
-              const isRejected = item.curatorStatus === "rejected";
+              const status = item.curatorStatus;
+              const isPending   = status === "pending";
+              const isReview    = status === "review";
+              const isApproved  = status === "approved";
+              const isFeatured  = status === "featured";
+              const isRejected  = status === "rejected";
+              const isArchived  = status === "archived";
 
-              const canPublish = !isCuratedPublic;
-              const canRevoke = isCuratedPublic;
-              const canApprove = !(isCuratedPublic && isApproved);
-              const canReject = !isRejected;
-              const hasActions = canApprove || canPublish || canReject || canRevoke;
+              const canReview  = isPending;
+              const canApprove = isPending || isReview;
+              const canFeature = isApproved;
+              const canRevoke  = isCuratedPublic;
+              const canPublish = !isCuratedPublic && isApproved;
+              const canReject  = !isRejected && !isArchived;
+              const canArchive = !isArchived;
+              const canPin     = (isApproved || isFeatured) && !item.pinned;
+              const canUnpin   = item.pinned;
+
+              const hasActions = canReview || canApprove || canFeature || canRevoke || canPublish || canReject || canArchive || canPin || canUnpin;
+
+              const statusColor: Record<string, string> = {
+                pending:  "text-amber-300",
+                review:   "text-sky-300",
+                approved: "text-emerald-300",
+                featured: "text-aura",
+                rejected: "text-rose-400",
+                archived: "text-mist",
+              };
 
               return (
                 <>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <span className="eyebrow">{item.curatorStatus}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`eyebrow ${statusColor[status] ?? ""}`}>{status}</span>
+                  {item.pinned && (
+                    <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-gold">
+                      przypiety
+                    </span>
+                  )}
+                </div>
                 <h2 className="mt-4 text-2xl font-semibold text-white">{item.entry.title}</h2>
                 <p className="mt-2 text-sm uppercase tracking-[0.18em] text-gold">{item.room.title}</p>
                 <p className="mt-3 text-xs uppercase tracking-[0.16em] text-mist">
-                  status logiczny: {isCuratedPublic ? "opublikowany w ABSOLUT" : "poza ABSOLUT"}
+                  {isCuratedPublic ? "opublikowany w ABSOLUT" : "poza ABSOLUT"}
+                  {item.entry.locked ? " \u00b7 zablokowany" : ""}
                 </p>
               </div>
               <div className="text-right text-sm text-mist">
@@ -104,22 +138,15 @@ export default async function AdminPage({
               </label>
 
               <div className="flex flex-wrap gap-2">
+                {canReview  ? <AdminSubmitButton value="review"  label="Review" /> : null}
                 {canApprove ? <AdminSubmitButton value="approve" label="Approve" /> : null}
-                {canPublish ? (
-                  <AdminSubmitButton
-                    value="publish"
-                    label="Publish"
-                    confirmMessage="Czy na pewno opublikowac wpis w ABSOLUT?"
-                  />
-                ) : null}
-                {canReject ? <AdminSubmitButton value="reject" label="Reject" /> : null}
-                {canRevoke ? (
-                  <AdminSubmitButton
-                    value="revoke"
-                    label="Revoke"
-                    confirmMessage="Czy na pewno cofnac publikacje wpisu?"
-                  />
-                ) : null}
+                {canFeature ? <AdminSubmitButton value="feature" label="Feature" confirmMessage="Oznaczyc wpis jako Featured?" /> : null}
+                {canPublish ? <AdminSubmitButton value="publish" label="Publish" confirmMessage="Czy na pewno opublikowac wpis w ABSOLUT?" /> : null}
+                {canPin     ? <AdminSubmitButton value="pin"     label="Pin" /> : null}
+                {canUnpin   ? <AdminSubmitButton value="unpin"   label="Unpin" /> : null}
+                {canReject  ? <AdminSubmitButton value="reject"  label="Reject" /> : null}
+                {canRevoke  ? <AdminSubmitButton value="revoke"  label="Revoke" confirmMessage="Czy na pewno cofnac publikacje wpisu?" /> : null}
+                {canArchive ? <AdminSubmitButton value="archive" label="Archive" confirmMessage="Zarchiwizowac wpis? Zostanie ukryty z publicznego widoku." /> : null}
 
                 {!hasActions ? (
                   <span className="rounded-full border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.16em] text-mist">

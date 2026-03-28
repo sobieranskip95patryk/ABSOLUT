@@ -72,6 +72,7 @@ export const demoEntries: Entry[] = [
     visibility: "curated_public",
     createdAt: "2026-03-28T09:00:00Z",
     isCurated: true,
+    locked: false,
   },
   {
     id: "entry-2",
@@ -81,6 +82,7 @@ export const demoEntries: Entry[] = [
     visibility: "public_room",
     createdAt: "2026-03-27T18:15:00Z",
     isCurated: true,
+    locked: false,
   },
   {
     id: "entry-3",
@@ -90,6 +92,7 @@ export const demoEntries: Entry[] = [
     visibility: "curated_public",
     createdAt: "2026-03-27T12:05:00Z",
     isCurated: true,
+    locked: false,
   },
   {
     id: "entry-4",
@@ -99,6 +102,7 @@ export const demoEntries: Entry[] = [
     visibility: "public_room",
     createdAt: "2026-03-26T22:00:00Z",
     isCurated: false,
+    locked: false,
   },
   {
     id: "entry-5",
@@ -108,6 +112,7 @@ export const demoEntries: Entry[] = [
     visibility: "curated_public",
     createdAt: "2026-03-26T08:00:00Z",
     isCurated: true,
+    locked: false,
   },
   {
     id: "entry-6",
@@ -117,6 +122,7 @@ export const demoEntries: Entry[] = [
     visibility: "private",
     createdAt: "2026-03-28T10:20:00Z",
     isCurated: false,
+    locked: false,
   },
   {
     id: "entry-7",
@@ -126,6 +132,7 @@ export const demoEntries: Entry[] = [
     visibility: "private",
     createdAt: "2026-03-28T11:00:00Z",
     isCurated: false,
+    locked: false,
   },
 ];
 
@@ -159,6 +166,7 @@ export const demoCurations: Curation[] = [
     entryId: "entry-1",
     curatorStatus: "approved",
     featuredLevel: 3,
+    pinned: false,
     publishedAt: "2026-03-28T09:15:00Z",
   },
   {
@@ -166,6 +174,7 @@ export const demoCurations: Curation[] = [
     entryId: "entry-3",
     curatorStatus: "approved",
     featuredLevel: 2,
+    pinned: false,
     publishedAt: "2026-03-27T12:20:00Z",
   },
   {
@@ -173,6 +182,7 @@ export const demoCurations: Curation[] = [
     entryId: "entry-5",
     curatorStatus: "approved",
     featuredLevel: 1,
+    pinned: false,
     publishedAt: "2026-03-26T08:30:00Z",
   },
   {
@@ -180,5 +190,6 @@ export const demoCurations: Curation[] = [
     entryId: "entry-7",
     curatorStatus: "pending",
     featuredLevel: 0,
+    pinned: false,
   },
 ];

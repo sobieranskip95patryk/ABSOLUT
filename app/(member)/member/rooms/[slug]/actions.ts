@@ -22,6 +22,7 @@ function mapMemberError(error: unknown, fallback: string) {
   if (normalized.includes("forbidden")) return "forbidden";
   if (normalized.includes("room not found")) return "room_not_found";
   if (normalized.includes("entry not found")) return "entry_not_found";
+  if (normalized.includes("entry_locked") || normalized.includes("entry is locked")) return "entry_locked";
   if (normalized.includes("invalid")) return "invalid_request";
   return fallback;
 }

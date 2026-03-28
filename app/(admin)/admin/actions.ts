@@ -6,12 +6,17 @@ import { requireRole } from "@/lib/auth/server";
 import { ADMIN_ROLES } from "@/lib/auth/roles";
 import { performAdminEntryAction, type AdminEntryAction } from "@/lib/data/repository";
 
-const allowedActions = new Set<AdminEntryAction>(["approve", "reject", "publish", "revoke"]);
+const allowedActions = new Set<AdminEntryAction>(["approve", "reject", "publish", "revoke", "review", "feature", "archive", "pin", "unpin"]);
 
 function successCodeForAction(action: AdminEntryAction) {
   if (action === "approve") return "approved";
   if (action === "publish") return "published";
   if (action === "reject") return "rejected";
+  if (action === "review") return "reviewed";
+  if (action === "feature") return "featured";
+  if (action === "archive") return "archived";
+  if (action === "pin") return "pinned";
+  if (action === "unpin") return "unpinned";
   return "revoked";
 }
 

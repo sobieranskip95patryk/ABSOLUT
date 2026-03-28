@@ -1,6 +1,6 @@
 import { demoCurations, demoDialogMessages, demoEntries, demoRooms } from "@/lib/mock/data";
 import { isMockMode } from "@/lib/env";
-import { DialogMessage, Entry, Room } from "@/lib/data/types";
+import { CuratorStatus, DialogMessage, Entry, EntryVersion, Room, Tag } from "@/lib/data/types";
 import { getSupabaseClient } from "@/lib/supabase/server";
 import { createSupabaseServerClient } from "@/lib/auth/server";
 
@@ -31,6 +31,22 @@ type EntryRow = {
   visibility: Entry["visibility"];
   created_at: string;
   is_curated: boolean;
+  locked: boolean;
+};
+
+type EntryVersionRow = {
+  id: string;
+  version_number: number;
+  title: string;
+  content: string;
+  visibility: string;
+  created_by: string | null;
+  created_at: string;
+};
+
+type TagRow = {
+  name: string;
+  entry_count: number;
 };
 
 type DialogMessageRow = {
@@ -44,8 +60,9 @@ type DialogMessageRow = {
 type CurationRow = {
   id: string;
   entry_id: string;
-  curator_status: "approved" | "pending" | "rejected";
+  curator_status: CuratorStatus;
   featured_level: number;
+  pinned: boolean;
   published_at: string | null;
 };
 
@@ -64,7 +81,7 @@ type ConsentRow = {
   allow_anonymous_publication: boolean;
 };
 
-export type AdminEntryAction = "approve" | "reject" | "publish" | "revoke";
+export type AdminEntryAction = "approve" | "reject" | "publish" | "revoke" | "review" | "feature" | "archive" | "pin" | "unpin";
 export type MemberEntryAction = "create" | "update" | "request_curation";
 
 export type AuditLogFilters = {
@@ -123,6 +140,19 @@ function entryFromRow(row: EntryRow): Entry {
     visibility: row.visibility,
     createdAt: row.created_at,
     isCurated: row.is_curated,
+    locked: row.locked ?? false,
+  };
+}
+
+function entryVersionFromRow(row: EntryVersionRow): EntryVersion {
+  return {
+    id: row.id,
+    versionNumber: row.version_number,
+    title: row.title,
+    content: row.content,
+    visibility: row.visibility as Entry["visibility"],
+    createdBy: row.created_by,
+    createdAt: row.created_at,
   };
 }
 
@@ -207,7 +237,28 @@ export async function getRoomBySlug(slug: string): Promise<Room | undefined> {
   );
 }
 
-export async function getAbsolutEntries(): Promise<Array<Entry & { room: Room }>> {
+export type AbsolutView = "newest" | "top" | "thematic";
+
+export async function getAbsolutTags(): Promise<Tag[]> {
+  if (isMockMode()) return [];
+
+  return withMockFallback(
+    "getAbsolutTags",
+    () => [],
+    async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error("Supabase client is not configured");
+      const { data, error } = await (supabase as any).rpc("get_absolut_tags");
+      if (error) throw error;
+      return (data as TagRow[]).map((row) => ({ name: row.name, entryCount: Number(row.entry_count) }));
+    },
+  );
+}
+
+export async function getAbsolutEntries(
+  view: AbsolutView = "newest",
+  tag?: string,
+): Promise<Array<Entry & { room: Room; featuredLevel: number; curatorStatus: string; pinned: boolean; tags: string[] }>> {
   if (!isMockMode()) {
     return withMockFallback(
       "getAbsolutEntries",
@@ -221,17 +272,29 @@ export async function getAbsolutEntries(): Promise<Array<Entry & { room: Room }>
           demoEntries
             .filter((entry) => entry.visibility !== "private")
             .filter((entry) => entry.visibility === "public_room" || approvedEntryIds.has(entry.id))
-            .map((entry) => ({
-              ...entry,
-              room: rooms.find((room) => room.id === entry.roomId)!,
-            })),
+            .map((entry) => {
+              const curation = demoCurations.find((c) => c.entryId === entry.id);
+              return {
+                ...entry,
+                room: rooms.find((room) => room.id === entry.roomId)!,
+                featuredLevel: curation?.featuredLevel ?? 0,
+                curatorStatus: curation?.curatorStatus ?? "pending",
+                pinned: curation?.pinned ?? false,
+                tags: [] as string[],
+              };
+            }),
         );
       },
       async () => {
         const supabase = getSupabaseClient();
         if (!supabase) throw new Error("Supabase client is not configured");
 
-        const { data, error } = await (supabase as any).rpc("get_absolut_feed", { p_limit: 200, p_offset: 0 });
+        const { data, error } = await (supabase as any).rpc("get_absolut_feed", {
+          p_view: view,
+          p_tag: tag ?? null,
+          p_limit: 200,
+          p_offset: 0,
+        });
         if (error) throw error;
 
         type AbsolutFeedRow = {
@@ -244,6 +307,9 @@ export async function getAbsolutEntries(): Promise<Array<Entry & { room: Room }>
           visibility: Entry["visibility"];
           created_at: string;
           featured_level: number;
+          curator_status: string;
+          pinned: boolean;
+          tags: string[];
         };
 
         return (data as AbsolutFeedRow[]).map((row) => {
@@ -268,9 +334,17 @@ export async function getAbsolutEntries(): Promise<Array<Entry & { room: Room }>
             visibility: row.visibility,
             createdAt: row.created_at,
             isCurated: row.visibility === "curated_public",
+            locked: false,
           };
 
-          return { ...entry, room };
+          return {
+            ...entry,
+            room,
+            featuredLevel: row.featured_level ?? 0,
+            curatorStatus: row.curator_status ?? "none",
+            pinned: row.pinned ?? false,
+            tags: row.tags ?? [],
+          };
         });
       },
     );
@@ -288,8 +362,23 @@ export async function getAbsolutEntries(): Promise<Array<Entry & { room: Room }>
       .map((entry) => ({
         ...entry,
         room: rooms.find((room) => room.id === entry.roomId)!,
+        featuredLevel: 0,
+        curatorStatus: "none",
+        pinned: false,
+        tags: [],
       })),
   );
+}
+
+export async function getEntryVersions(entryId: string): Promise<EntryVersion[]> {
+  if (isMockMode()) return [];
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase server client is not configured");
+
+  const { data, error } = await (supabase as any).rpc("get_entry_versions", { p_entry_id: entryId });
+  if (error) throw error;
+  return ((data as EntryVersionRow[]) ?? []).map(entryVersionFromRow);
 }
 
 export async function getRoomPublicEntries(slug: string): Promise<Entry[]> {
@@ -421,6 +510,7 @@ export async function getAdminQueue() {
           entryId: curation.entry_id,
           curatorStatus: curation.curator_status,
           featuredLevel: curation.featured_level,
+          pinned: curation.pinned ?? false,
           publishedAt: curation.published_at ?? undefined,
           entry,
           room,
@@ -434,6 +524,7 @@ export async function getAdminQueue() {
     const entry = demoEntries.find((item) => item.id === curation.entryId)!;
     return {
       ...curation,
+      pinned: false,
       entry,
       room: rooms.find((room) => room.id === entry.roomId)!,
     };
@@ -479,6 +570,39 @@ export async function performAdminEntryAction(input: {
     const { error } = await (supabase as any).rpc("reject_curation", {
       p_entry_id: input.entryId,
     });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.action === "review") {
+    const { error } = await (supabase as any).rpc("review_entry", { p_entry_id: input.entryId });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.action === "feature") {
+    const { error } = await (supabase as any).rpc("feature_entry", {
+      p_entry_id: input.entryId,
+      p_featured_level: featuredLevel,
+    });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.action === "archive") {
+    const { error } = await (supabase as any).rpc("archive_entry", { p_entry_id: input.entryId });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.action === "pin") {
+    const { error } = await (supabase as any).rpc("toggle_pin_entry", { p_entry_id: input.entryId, p_pinned: true });
+    if (error) throw error;
+    return;
+  }
+
+  if (input.action === "unpin") {
+    const { error } = await (supabase as any).rpc("toggle_pin_entry", { p_entry_id: input.entryId, p_pinned: false });
     if (error) throw error;
     return;
   }

@@ -2,7 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
 import { getAuthUser, requireRole } from "@/lib/auth/server";
 import { MEMBER_ROLES } from "@/lib/auth/roles";
-import { getDialogMessagesForEntries, getRoomBySlug, getRoomConsentSettings, getRoomPrivateEntries, getRooms } from "@/lib/data/repository";
+import {
+  getDialogMessagesForEntries,
+  getEntryVersions,
+  getRoomBySlug,
+  getRoomConsentSettings,
+  getRoomPrivateEntries,
+  getRooms,
+} from "@/lib/data/repository";
 import { runMemberConsentAction, runMemberEntryAction } from "@/app/(member)/member/rooms/[slug]/actions";
 
 function memberSuccessMessage(code: string) {
@@ -18,6 +25,7 @@ function memberErrorMessage(code: string) {
   if (code === "room_not_found") return "Nie znaleziono pokoju.";
   if (code === "entry_not_found") return "Nie znaleziono wpisu.";
   if (code === "missing_entry_fields") return "Uzupelnij tytul i tresc wpisu.";
+  if (code === "entry_locked") return "Wpis jest zablokowany do edycji — oczekuje na kuracje.";
   if (code === "invalid_request") return "Nieprawidlowe dane zadania.";
   return "Operacja nie powiodla sie. Sprobuj ponownie.";
 }
@@ -32,7 +40,7 @@ export default async function MemberRoomPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{ ok?: string; error?: string }>;
+  searchParams?: Promise<{ ok?: string; error?: string; versions?: string }>;
 }) {
   const { slug } = await params;
   const role = await requireRole(MEMBER_ROLES, `/member/rooms/${slug}`);
@@ -52,14 +60,18 @@ export default async function MemberRoomPage({
   const dialogMessages = await getDialogMessagesForEntries(entries.map((entry) => entry.id));
   const status = await searchParams;
 
+  // Load versions for entry if query param present
+  const versionsEntryId = status?.versions ?? null;
+  const versions = versionsEntryId ? await getEntryVersions(versionsEntryId) : null;
+
   return (
     <PageShell>
       <section className="content-wrap">
         <div className="panel p-8 sm:p-10">
           <span className="eyebrow">/member/rooms/{room.slug}</span>
-          <h1 className="headline mt-4">Prywatna warstwa ownera - {room.title}</h1>
+          <h1 className="headline mt-4">Prywatna warstwa ownera &mdash; {room.title}</h1>
           <p className="copy mt-5 max-w-3xl">
-            To widok docelowo chroniony rolami. Pokazuje komplet wpisow pokoju, w tym private,
+            To widok chroniony rolami. Pokazuje komplet wpisow pokoju, w tym private,
             oraz dialogi AI powiazane z prywatnymi decyzjami ownera.
           </p>
 
@@ -75,6 +87,7 @@ export default async function MemberRoomPage({
             </p>
           ) : null}
 
+          {/* New entry form */}
           <form action={runMemberEntryAction} className="mt-8 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-5">
             <input type="hidden" name="slug" value={slug} />
             <input type="hidden" name="entryAction" value="create" />
@@ -110,6 +123,7 @@ export default async function MemberRoomPage({
             </div>
           </form>
 
+          {/* Consent settings */}
           <form action={runMemberConsentAction} className="mt-4 grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-5">
             <input type="hidden" name="slug" value={slug} />
             <h2 className="text-lg font-semibold text-white">Zgody publikacyjne</h2>
@@ -139,73 +153,134 @@ export default async function MemberRoomPage({
         <div className="panel p-8">
           <h2 className="text-2xl font-semibold text-white">Wpisy pokoju</h2>
           <div className="mt-6 space-y-4">
-            {entries.map((entry) => (
-              <article key={entry.id} className="data-card">
-                <span className="eyebrow">{entry.visibility}</span>
-                <h3 className="mt-4 text-xl font-semibold text-white">{entry.title}</h3>
-                <p className="copy mt-3">{entry.content}</p>
+            {entries.map((entry) => {
+              const isLocked = entry.locked;
+              const showVersions = versionsEntryId === entry.id;
 
-                <form action={runMemberEntryAction} className="mt-4 space-y-3 rounded-xl border border-white/10 p-4">
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="entryAction" value="update" />
-                  <input type="hidden" name="entryId" value={entry.id} />
-
-                  <input
-                    type="text"
-                    name="title"
-                    defaultValue={entry.title}
-                    className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white"
-                  />
-                  <textarea
-                    name="content"
-                    rows={3}
-                    defaultValue={entry.content}
-                    className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white"
-                  />
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      name="visibility"
-                      defaultValue={entry.visibility === "private" ? "private" : "public_room"}
-                      className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white"
-                    >
-                      <option value="private">private</option>
-                      <option value="public_room">public_room</option>
-                    </select>
-                    <button type="submit" className="action-secondary">
-                      Zapisz wpis
-                    </button>
+              return (
+                <article key={entry.id} className="data-card">
+                  {/* Header row */}
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <span className="eyebrow">{entry.visibility}</span>
+                    <div className="flex items-center gap-2">
+                      {isLocked && (
+                        <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-amber-300">
+                          zablokowany &mdash; oczekuje kuracji
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </form>
 
-                <form action={runMemberEntryAction} className="mt-3 flex flex-wrap items-center gap-2">
-                  <input type="hidden" name="slug" value={slug} />
-                  <input type="hidden" name="entryAction" value="request_curation" />
-                  <input type="hidden" name="entryId" value={entry.id} />
-                  <label className="text-xs uppercase tracking-[0.14em] text-mist">
-                    featured
-                    <input
-                      type="number"
-                      name="featuredLevel"
-                      min={0}
-                      max={10}
-                      defaultValue={0}
-                      className="ml-2 w-20 rounded-full border border-white/15 bg-black/30 px-2 py-1 text-xs text-white"
-                    />
-                  </label>
-                  <button type="submit" className="action-secondary">
-                    Zglos do kuracji
-                  </button>
-                </form>
-              </article>
-            ))}
+                  <h3 className="mt-4 text-xl font-semibold text-white">{entry.title}</h3>
+                  <p className="copy mt-3">{entry.content}</p>
+
+                  {/* Edit form — disabled when locked */}
+                  {isLocked ? (
+                    <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 px-4 py-3 text-xs text-amber-300">
+                      Edycja zablokowana — wpis oczekuje na decyzje kuratora.
+                      Zostanie odblokowany po zatwierdzeniu lub odrzuceniu.
+                    </div>
+                  ) : (
+                    <form action={runMemberEntryAction} className="mt-4 space-y-3 rounded-xl border border-white/10 p-4">
+                      <input type="hidden" name="slug" value={slug} />
+                      <input type="hidden" name="entryAction" value="update" />
+                      <input type="hidden" name="entryId" value={entry.id} />
+
+                      <input
+                        type="text"
+                        name="title"
+                        defaultValue={entry.title}
+                        className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white"
+                      />
+                      <textarea
+                        name="content"
+                        rows={3}
+                        defaultValue={entry.content}
+                        className="w-full rounded-xl border border-white/15 bg-black/20 px-3 py-2 text-sm text-white"
+                      />
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          name="visibility"
+                          defaultValue={entry.visibility === "private" ? "private" : "public_room"}
+                          className="rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs text-white"
+                        >
+                          <option value="private">private</option>
+                          <option value="public_room">public_room</option>
+                        </select>
+                        <button type="submit" className="action-secondary">
+                          Zapisz wpis
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Curation request — only when not locked */}
+                  {!isLocked && (
+                    <form action={runMemberEntryAction} className="mt-3 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="slug" value={slug} />
+                      <input type="hidden" name="entryAction" value="request_curation" />
+                      <input type="hidden" name="entryId" value={entry.id} />
+                      <label className="text-xs uppercase tracking-[0.14em] text-mist">
+                        featured
+                        <input
+                          type="number"
+                          name="featuredLevel"
+                          min={0}
+                          max={10}
+                          defaultValue={0}
+                          className="ml-2 w-20 rounded-full border border-white/15 bg-black/30 px-2 py-1 text-xs text-white"
+                        />
+                      </label>
+                      <button type="submit" className="action-secondary">
+                        Zglos do kuracji
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Version history toggle */}
+                  <div className="mt-4 flex items-center gap-3">
+                    <a
+                      href={`/member/rooms/${slug}?${showVersions ? "" : `versions=${entry.id}`}`}
+                      className="text-xs uppercase tracking-[0.14em] text-mist hover:text-white transition-colors"
+                    >
+                      {showVersions ? "Ukryj historię" : "Historia wersji"}
+                    </a>
+                  </div>
+
+                  {/* Version list */}
+                  {showVersions && versions && (
+                    <div className="mt-3 space-y-2 rounded-xl border border-white/10 bg-black/20 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-mist mb-3">
+                        Historia wersji ({versions.length})
+                      </p>
+                      {versions.length === 0 ? (
+                        <p className="text-xs text-mist">Brak zapisanych wersji.</p>
+                      ) : (
+                        versions.map((ver) => (
+                          <div key={ver.id} className="rounded-lg border border-white/10 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-white">v{ver.versionNumber}</span>
+                              <span className="text-[11px] text-mist">{new Date(ver.createdAt).toLocaleString("pl")}</span>
+                            </div>
+                            <p className="mt-1 text-sm font-medium text-white/80">{ver.title}</p>
+                            <p className="mt-1 text-xs text-mist line-clamp-3">{ver.content}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </div>
+
         <aside className="panel p-8">
           <h2 className="text-2xl font-semibold text-white">Dialogi AI</h2>
           <div className="mt-6 space-y-4">
             {dialogMessages.length === 0 ? (
-              <p className="copy">Brak dialogow AI dla tego pokoju w danych demo.</p>
+              <p className="copy">Brak dialogow AI dla tego pokoju.</p>
             ) : (
               dialogMessages.map((message) => (
                 <article key={message.id} className="data-card">
