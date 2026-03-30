@@ -24,8 +24,12 @@ Centralny modul to ABSOLUT jako agregator kuratorowanych tresci z pokoi.
 
 ## Zalozenie strategiczne
 
-Aktualne pliki statyczne traktujemy jako referencje wizualna.
-Dalszy rozwoj realizujemy w architekturze aplikacji danych.
+
+## Katalog `prototype/` — referencja wizualna
+
+Wszystkie pliki HTML z poprzednich wersji (legacy) zostały przeniesione do katalogu `prototype/`.
+Nie są one częścią runtime aplikacji — służą wyłącznie jako referencja wizualna i historyczna.
+Dalszy rozwój realizujemy wyłącznie w architekturze aplikacji danych (Next.js + Supabase).
 
 ## Mapa URL (App Router)
 
