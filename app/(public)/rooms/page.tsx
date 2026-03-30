@@ -1,7 +1,7 @@
 import { PageShell } from "@/components/layout/PageShell";
-import { RoomCard } from "@/components/rooms/RoomCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getRooms } from "@/lib/data/repository";
+import { RoomCard } from "@/features/rooms/ui/RoomCard";
+import { getRooms } from "@/features/rooms/data/queries";
 
 export default async function RoomsPage({
   searchParams,

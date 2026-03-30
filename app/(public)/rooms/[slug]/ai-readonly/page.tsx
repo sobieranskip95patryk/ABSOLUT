@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/layout/PageShell";
-import { getRoomBySlug, getRoomPublicEntries, getRooms } from "@/lib/data/repository";
+import { getRoomBySlug, getRoomPublicEntries, getRooms } from "@/features/rooms/data/queries";
 
 export async function generateStaticParams() {
   const rooms = await getRooms();

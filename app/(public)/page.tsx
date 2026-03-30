@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
-import { RoomCard } from "@/components/rooms/RoomCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { getAbsolutEntries, getRooms } from "@/lib/data/repository";
+
+import { RoomCard } from "@/features/rooms/ui/RoomCard";
 
 export default async function HomePage() {
   const [rooms, absolutEntries] = await Promise.all([getRooms(), getAbsolutEntries()]);
