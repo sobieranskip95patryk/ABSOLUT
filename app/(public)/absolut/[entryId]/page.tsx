@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageShell } from "@/components/layout/PageShell";
-import { getAbsolutEntries, getAbsolutEntryById, recordEntryView } from "@/lib/data/repository";
+import { getAbsolutEntries, getAbsolutEntryById } from "@/features/absolut/data/queries";
+import { recordEntryView } from "@/lib/data/repository";
 
 type Props = {
   params: Promise<{ entryId: string }>;

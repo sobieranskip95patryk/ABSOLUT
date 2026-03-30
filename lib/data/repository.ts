@@ -120,7 +120,7 @@ export type ConsentSettings = {
   allowAnonymousPublication: boolean;
 };
 
-function roomFromRow(row: RoomRow): Room {
+export function roomFromRow(row: RoomRow): Room {
   return {
     id: row.id,
     ownerId: row.owner_id,
@@ -184,7 +184,7 @@ function auditLogFromRow(row: AuditLogRow): AuditLogItem {
   };
 }
 
-function withMockFallback<T>(label: string, fallback: () => T | Promise<T>, run: () => Promise<T>): Promise<T> {
+export function withMockFallback<T>(label: string, fallback: () => T | Promise<T>, run: () => Promise<T>): Promise<T> {
   return run().catch(async (error) => {
     console.warn(`[repository] ${label} failed, falling back to mock data`, error);
     return await fallback();

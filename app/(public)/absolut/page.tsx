@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { AbsolutEntryCard } from "@/components/absolut/AbsolutEntryCard";
+import { AbsolutEntryCard } from "@/features/absolut/ui/AbsolutEntryCard";
 import { PageShell } from "@/components/layout/PageShell";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { getAbsolutEntries, getAbsolutTags, searchAbsolutEntries, type AbsolutView } from "@/lib/data/repository";
+import { getAbsolutEntries, getAbsolutTags } from "@/features/absolut/data/queries";
+import type { AbsolutView } from "@/features/absolut/data/queries";
+import { searchAbsolutEntries } from "@/lib/data/repository";
 
 const VIEW_LABELS: Record<AbsolutView, string> = {
   newest: "Najnowsze",
